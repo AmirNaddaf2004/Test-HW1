@@ -26,6 +26,7 @@ class AutoDriverTest {
     private static final double EXPECTED_NO_BRAKE_PRESSURE = 0.0;
     private static final double EXPECTED_SAFE_MODE_BRAKE_PRESSURE = 30.0;
     private static final String SENSOR_FAILURE_MESSAGE = "Sensor read failure";
+    private static final double DELTA = 1e-6;
 
     private SpeedSensor defaultSpeedSensor;
     private ObstacleSensor defaultObstacleSensor;
@@ -61,10 +62,15 @@ class AutoDriverTest {
 
     @ParameterizedTest
     @CsvSource({
-            "1.0,  -45.0",
-            "-1.0,  45.0"
+            "0.0,     0.0",
+            "0.5,     0.0",
+            "-0.5,    0.0",
+            "0.5001, -45.0",
+            "-0.5001, 45.0",
+            "1.0,    -45.0",
+            "-1.0,    45.0"
     })
-    void tick_LaneOffsetExceedsThreshold_SteersInOppositeDirectionToCorrectLane(
+    void tick_VariousLaneOffsets_AdjustsSteeringAngleAccordingToThreshold(
             double laneOffsetMeters,
             double expectedSteeringAngleDegrees) {
         LaneSensor offsetLaneSensor = () -> laneOffsetMeters;
@@ -77,7 +83,7 @@ class AutoDriverTest {
 
         AutoDriver.DriveResult actualResult = autoDriver.tick(GearBox.Gear.D);
 
-        assertEquals(expectedSteeringAngleDegrees, actualResult.steeringAngleDegrees());
+        assertEquals(expectedSteeringAngleDegrees, actualResult.steeringAngleDegrees(), DELTA);
     }
 
     @ParameterizedTest
@@ -116,10 +122,15 @@ class AutoDriverTest {
         ObstacleSensor failingObstacle = () -> {
             throw new SensorFailureException(SENSOR_FAILURE_MESSAGE);
         };
+        LaneSensor failingLane = () -> {
+            throw new SensorFailureException(SENSOR_FAILURE_MESSAGE);
+        };
 
         return Stream.of(
                 Arguments.of(failingSpeed, okObstacle, okLane),
-                Arguments.of(okSpeed, failingObstacle, okLane)
+                Arguments.of(okSpeed, failingObstacle, okLane),
+                Arguments.of(okSpeed, okObstacle, failingLane),
+                Arguments.of(failingSpeed, failingObstacle, failingLane)
         );
     }
 }

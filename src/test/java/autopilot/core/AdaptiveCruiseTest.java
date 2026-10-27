@@ -59,21 +59,24 @@ class AdaptiveCruiseTest {
             AdaptiveCruise.Mode expectedMode,
             double expectedAmount) {
         AdaptiveCruise cruise = new AdaptiveCruise(targetSpeedKmh);
-        AdaptiveCruise.Decision expectedDecision = new AdaptiveCruise.Decision(expectedMode, expectedAmount);
 
         AdaptiveCruise.Decision actualDecision = cruise.update(currentSpeedKmh, distanceMeters);
 
-        assertEquals(expectedDecision.mode(), actualDecision.mode());
-        assertEquals(expectedDecision.amount(), actualDecision.amount(), DELTA);
+        assertEquals(expectedMode, actualDecision.mode());
+        assertEquals(expectedAmount, actualDecision.amount(), DELTA);
     }
 
     @Test
     void update_WhenAlreadyBrakingAndDistanceBelowSafeDistance_AppliesProportionalBrake() {
         adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_BELOW_SAFE_30_METERS);
 
-        AdaptiveCruise.Decision secondDecision = adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_BELOW_SAFE_30_METERS);
+        AdaptiveCruise.Decision secondDecision = adaptiveCruise.update(
+                TEST_SPEED_80_KMH,
+                DISTANCE_BELOW_SAFE_30_METERS
+        );
 
-        assertEquals(new AdaptiveCruise.Decision(AdaptiveCruise.Mode.BRAKE, EXPECTED_PROPORTIONAL_BRAKE_25), secondDecision);
+        assertEquals(AdaptiveCruise.Mode.BRAKE, secondDecision.mode());
+        assertEquals(EXPECTED_PROPORTIONAL_BRAKE_25, secondDecision.amount(), DELTA);
     }
 
     @Test
@@ -85,10 +88,8 @@ class AdaptiveCruiseTest {
                 DISTANCE_IN_HYSTERESIS_BAND_44_METERS
         );
 
-        assertEquals(
-                new AdaptiveCruise.Decision(AdaptiveCruise.Mode.BRAKE, EXPECTED_HYSTERESIS_BRAKE_PRESSURE),
-                hysteresisDecision
-        );
+        assertEquals(AdaptiveCruise.Mode.BRAKE, hysteresisDecision.mode());
+        assertEquals(EXPECTED_HYSTERESIS_BRAKE_PRESSURE, hysteresisDecision.amount(), DELTA);
     }
 
     @Test
@@ -100,14 +101,12 @@ class AdaptiveCruiseTest {
                 DISTANCE_AT_RELEASE_THRESHOLD_48_METERS
         );
 
-        assertEquals(
-                new AdaptiveCruise.Decision(AdaptiveCruise.Mode.ACCELERATE, EXPECTED_MAX_ACCELERATION_STEP),
-                releasedDecision
-        );
+        assertEquals(AdaptiveCruise.Mode.ACCELERATE, releasedDecision.mode());
+        assertEquals(EXPECTED_MAX_ACCELERATION_STEP, releasedDecision.amount(), DELTA);
     }
 
     @ParameterizedTest
-    @ValueSource(doubles = {-1.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    @ValueSource(doubles = {-0.1, -50.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
     void update_InvalidSpeed_ThrowsIllegalArgumentException(double invalidSpeedKmh) {
         assertThrows(
                 IllegalArgumentException.class,
@@ -116,7 +115,7 @@ class AdaptiveCruiseTest {
     }
 
     @ParameterizedTest
-    @ValueSource(doubles = {-1.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    @ValueSource(doubles = {-0.1, -50.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
     void update_InvalidDistance_ThrowsIllegalArgumentException(double invalidDistanceMeters) {
         assertThrows(
                 IllegalArgumentException.class,
