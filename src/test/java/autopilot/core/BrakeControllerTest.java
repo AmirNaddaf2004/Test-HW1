@@ -15,9 +15,10 @@ class BrakeControllerTest {
     private static final double ABS_TRIGGER_PRESSURE = 95.0;
     private static final double NON_ABS_PRESSURE = 50.0;
     private static final double ABS_TRIGGER_SPEED_KMH = 60.0;
-    private static final double NORMAL_SPEED_KMH = 40.0;
+    private static final double MODERATE_SPEED_KMH = 40.0;
     private static final double ABS_HIGH_PULSE_PRESSURE = 90.0;
     private static final double ABS_LOW_PULSE_PRESSURE = 60.0;
+    private static final double DELTA = 1e-6;
 
     private BrakeController brakeController;
 
@@ -31,9 +32,9 @@ class BrakeControllerTest {
             "0.0,   50.0, D, 0.0",
             "50.0,  60.0, D, 50.0",
             "80.0,  60.0, D, 80.0",
-            "90.0,  30.0, D, 90.0",
+            "85.0,  30.0, D, 85.0",
             "120.0, 20.0, R, 100.0",
-            "85.0,  35.0, N, 90.0",
+            "80.1,  30.1, N, 90.0",
             "150.0, 80.0, D, 90.0"
     })
     void apply_ValidInputsOnInitialCall_ReturnsExpectedBoundedOrAbsPressure(
@@ -43,16 +44,20 @@ class BrakeControllerTest {
             double expectedPressure) {
         double actualPressure = brakeController.apply(requestedPressure, speedKmh, gear);
 
-        assertEquals(expectedPressure, actualPressure);
+        assertEquals(expectedPressure, actualPressure, DELTA);
     }
 
     @Test
-    void apply_ConsecutiveAbsCalls_AlternatesBetweenHighAndLowPulse() {
-        brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+    void apply_ConsecutiveAbsCalls_AlternatesBetweenHighAndLowPulses() {
+        double firstPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+        double secondPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+        double thirdPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+        double fourthPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
 
-        double secondPulsePressure = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
-
-        assertEquals(ABS_LOW_PULSE_PRESSURE, secondPulsePressure);
+        assertEquals(ABS_HIGH_PULSE_PRESSURE, firstPulse, DELTA);
+        assertEquals(ABS_LOW_PULSE_PRESSURE, secondPulse, DELTA);
+        assertEquals(ABS_HIGH_PULSE_PRESSURE, thirdPulse, DELTA);
+        assertEquals(ABS_LOW_PULSE_PRESSURE, fourthPulse, DELTA);
     }
 
     @Test
@@ -62,14 +67,14 @@ class BrakeControllerTest {
 
         double pressureAfterReset = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
 
-        assertEquals(ABS_HIGH_PULSE_PRESSURE, pressureAfterReset);
+        assertEquals(ABS_HIGH_PULSE_PRESSURE, pressureAfterReset, DELTA);
     }
 
     @Test
     void apply_WhenGearIsPark_ThrowsIllegalStateException() {
         assertThrows(
                 IllegalStateException.class,
-                () -> brakeController.apply(NON_ABS_PRESSURE, NORMAL_SPEED_KMH, GearBox.Gear.P)
+                () -> brakeController.apply(NON_ABS_PRESSURE, MODERATE_SPEED_KMH, GearBox.Gear.P)
         );
     }
 
@@ -77,7 +82,7 @@ class BrakeControllerTest {
     void apply_WhenGearIsNull_ThrowsNullPointerException() {
         assertThrows(
                 NullPointerException.class,
-                () -> brakeController.apply(NON_ABS_PRESSURE, NORMAL_SPEED_KMH, null)
+                () -> brakeController.apply(NON_ABS_PRESSURE, MODERATE_SPEED_KMH, null)
         );
     }
 
@@ -86,7 +91,7 @@ class BrakeControllerTest {
     void apply_InvalidPressure_ThrowsIllegalArgumentException(double invalidPressure) {
         assertThrows(
                 IllegalArgumentException.class,
-                () -> brakeController.apply(invalidPressure, NORMAL_SPEED_KMH, GearBox.Gear.D)
+                () -> brakeController.apply(invalidPressure, MODERATE_SPEED_KMH, GearBox.Gear.D)
         );
     }
 
@@ -104,18 +109,19 @@ class BrakeControllerTest {
     void emergencyBrake_AllowedGears_SetsMaxPressureAndActivatesWarning(GearBox.Gear allowedGear) {
         brakeController.emergencyBrake(allowedGear);
 
-        assertEquals(MAX_PRESSURE, brakeController.getPressure());
+        assertEquals(MAX_PRESSURE, brakeController.getPressure(), DELTA);
         assertTrue(brakeController.isWarningActive());
     }
 
     @Test
-    void emergencyBrake_AfterHighAbsPulse_ResetsNextAbsPulseToHigh() {
+    void emergencyBrake_FollowedByNormalApply_KeepsWarningActiveAndResetsAbsPulseToHigh() {
         brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
         brakeController.emergencyBrake(GearBox.Gear.D);
 
         double nextAbsPressure = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
 
-        assertEquals(ABS_HIGH_PULSE_PRESSURE, nextAbsPressure);
+        assertEquals(ABS_HIGH_PULSE_PRESSURE, nextAbsPressure, DELTA);
+        assertTrue(brakeController.isWarningActive());
     }
 
     @Test

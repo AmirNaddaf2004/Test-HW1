@@ -1,6 +1,7 @@
 package autopilot.core;
 
 import autopilot.exception.IllegalGearChangeException;
+import autopilot.exception.SensorFailureException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -16,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class GearBoxTest {
 
     private static final double ZERO_SPEED_KMH = 0.0;
+    private static final double INVALID_NEGATIVE_SPEED_KMH = -10.0;
 
     @ParameterizedTest
     @MethodSource("validGearTransitionsProvider")
@@ -37,6 +39,7 @@ class GearBoxTest {
     private static Stream<Arguments> validGearTransitionsProvider() {
         return Stream.of(
                 Arguments.of(List.of(), 0.0, GearBox.Gear.P),
+                Arguments.of(List.of(), INVALID_NEGATIVE_SPEED_KMH, GearBox.Gear.P),
                 Arguments.of(List.of(), 0.0, GearBox.Gear.R),
                 Arguments.of(List.of(), 4.9, GearBox.Gear.R),
                 Arguments.of(List.of(GearBox.Gear.R), 50.0, GearBox.Gear.R),
@@ -88,6 +91,18 @@ class GearBoxTest {
 
         assertThrows(
                 IllegalArgumentException.class,
+                () -> gearBox.changeTo(GearBox.Gear.R)
+        );
+    }
+
+    @Test
+    void changeTo_WhenSpeedSensorFails_PropagatesSensorFailureException() {
+        GearBox gearBox = new GearBox(() -> {
+            throw new SensorFailureException("Speed sensor failure");
+        });
+
+        assertThrows(
+                SensorFailureException.class,
                 () -> gearBox.changeTo(GearBox.Gear.R)
         );
     }

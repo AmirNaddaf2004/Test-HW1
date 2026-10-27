@@ -16,6 +16,7 @@ class SteeringControllerTest {
     private static final double VALID_ANGLE_DEGREES = 30.0;
     private static final double REQUESTED_100_DEGREES = 100.0;
     private static final double EXPECTED_HIGH_SPEED_CLAMPED_TARGET = 90.0;
+    private static final double DELTA = 1e-6;
 
     private SteeringController steeringController;
 
@@ -26,7 +27,8 @@ class SteeringControllerTest {
 
     @ParameterizedTest
     @CsvSource({
-            "0.0,    50.0,  0.0,   0.0",
+            "0.0,    0.0,   0.0,   0.0",
+            "300.0,  0.0,   300.0, 60.0",
             "30.0,   80.0,  30.0,  30.0",
             "-45.0,  80.0, -45.0, -45.0",
             "60.0,   80.0,  60.0,  60.0",
@@ -44,8 +46,8 @@ class SteeringControllerTest {
             double expectedCurrentAngleDegrees) {
         double actualCurrentAngle = steeringController.update(requestedAngleDegrees, speedKmh);
 
-        assertEquals(expectedCurrentAngleDegrees, actualCurrentAngle);
-        assertEquals(expectedTargetAngleDegrees, steeringController.getTargetAngleDegrees());
+        assertEquals(expectedCurrentAngleDegrees, actualCurrentAngle, DELTA);
+        assertEquals(expectedTargetAngleDegrees, steeringController.getTargetAngleDegrees(), DELTA);
     }
 
     @Test
@@ -54,11 +56,21 @@ class SteeringControllerTest {
 
         double secondTickAngle = steeringController.update(REQUESTED_100_DEGREES, HIGH_SPEED_KMH);
 
-        assertEquals(EXPECTED_HIGH_SPEED_CLAMPED_TARGET, secondTickAngle);
+        assertEquals(EXPECTED_HIGH_SPEED_CLAMPED_TARGET, secondTickAngle, DELTA);
+    }
+
+    @Test
+    void update_FromNegativeAngleToPositiveTarget_MovesTowardTargetByMaxStepPerTick() {
+        steeringController.update(-60.0, NORMAL_SPEED_KMH);
+
+        double angleAfterFirstReverseStep = steeringController.update(60.0, NORMAL_SPEED_KMH);
+
+        assertEquals(0.0, angleAfterFirstReverseStep, DELTA);
     }
 
     @ParameterizedTest
     @CsvSource({
+            "0.0,    0.0",
             "40.0,   0.0",
             "-40.0,  0.0",
             "100.0,  0.0",
@@ -71,8 +83,8 @@ class SteeringControllerTest {
 
         double actualAngle = steeringController.selfCenter();
 
-        assertEquals(expectedAngleAfterOneSelfCenter, actualAngle);
-        assertEquals(0.0, steeringController.getTargetAngleDegrees());
+        assertEquals(expectedAngleAfterOneSelfCenter, actualAngle, DELTA);
+        assertEquals(0.0, steeringController.getTargetAngleDegrees(), DELTA);
     }
 
     @Test
@@ -82,7 +94,7 @@ class SteeringControllerTest {
 
         double angleAfterFirstSelfCenter = steeringController.selfCenter();
 
-        assertEquals(40.0, angleAfterFirstSelfCenter);
+        assertEquals(40.0, angleAfterFirstSelfCenter, DELTA);
     }
 
     @ParameterizedTest
