@@ -17,7 +17,6 @@ class BrakeControllerTest {
     private static final double ABS_TRIGGER_SPEED_KMH = 60.0;
     private static final double MODERATE_SPEED_KMH = 40.0;
     private static final double ABS_HIGH_PULSE_PRESSURE = 90.0;
-    private static final double ABS_LOW_PULSE_PRESSURE = 60.0;
     private static final double DELTA = 1e-6;
 
     private BrakeController brakeController;
@@ -47,17 +46,19 @@ class BrakeControllerTest {
         assertEquals(expectedPressure, actualPressure, DELTA);
     }
 
-    @Test
-    void apply_ConsecutiveAbsCalls_AlternatesBetweenHighAndLowPulses() {
-        double firstPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
-        double secondPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
-        double thirdPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
-        double fourthPulse = brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+    @ParameterizedTest
+    @CsvSource({"1, 90.0", "2, 60.0", "3, 90.0", "4, 60.0"})
+    void apply_ConsecutiveAbsCalls_AlternatesBetweenHighAndLowPulses(
+            int pulseNumber,
+            double expectedPressure) {
+        for (int pulse = 1; pulse < pulseNumber; pulse++) {
+            brakeController.apply(ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+        }
 
-        assertEquals(ABS_HIGH_PULSE_PRESSURE, firstPulse, DELTA);
-        assertEquals(ABS_LOW_PULSE_PRESSURE, secondPulse, DELTA);
-        assertEquals(ABS_HIGH_PULSE_PRESSURE, thirdPulse, DELTA);
-        assertEquals(ABS_LOW_PULSE_PRESSURE, fourthPulse, DELTA);
+        double actualPressure = brakeController.apply(
+                ABS_TRIGGER_PRESSURE, ABS_TRIGGER_SPEED_KMH, GearBox.Gear.D);
+
+        assertEquals(expectedPressure, actualPressure, DELTA);
     }
 
     @Test

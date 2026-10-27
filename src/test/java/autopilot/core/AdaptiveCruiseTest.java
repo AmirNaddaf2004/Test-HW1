@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,8 +20,6 @@ class AdaptiveCruiseTest {
     private static final double DISTANCE_BELOW_SAFE_30_METERS = 30.0;
     private static final double DISTANCE_IN_HYSTERESIS_BAND_44_METERS = 44.0;
     private static final double DISTANCE_AT_RELEASE_THRESHOLD_48_METERS = 48.0;
-    private static final double EXPECTED_PROPORTIONAL_BRAKE_25 = 25.0;
-    private static final double EXPECTED_HYSTERESIS_BRAKE_PRESSURE = 10.0;
     private static final double EXPECTED_MAX_ACCELERATION_STEP = 5.0;
     private static final double DELTA = 1e-6;
 
@@ -66,43 +65,42 @@ class AdaptiveCruiseTest {
         assertEquals(expectedAmount, actualDecision.amount(), DELTA);
     }
 
-    @Test
-    void update_WhenAlreadyBrakingAndDistanceBelowSafeDistance_AppliesProportionalBrake() {
+    @ParameterizedTest
+    @CsvSource({
+            "20.0,   EMERGENCY_BRAKE, 100.0",
+            "30.0,   BRAKE,            25.0",
+            "39.9,   BRAKE,             0.25",
+            "40.0,   BRAKE,            10.0",
+            "44.0,   BRAKE,            10.0",
+            "47.999, BRAKE,            10.0",
+            "48.0,   ACCELERATE,        5.0",
+            "49.0,   ACCELERATE,        5.0"
+    })
+    void update_WhenAlreadyBraking_ReturnsExpectedDecisionAtDistanceThresholds(
+            double distanceMeters,
+            AdaptiveCruise.Mode expectedMode,
+            double expectedAmount) {
         adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_BELOW_SAFE_30_METERS);
 
-        AdaptiveCruise.Decision secondDecision = adaptiveCruise.update(
-                TEST_SPEED_80_KMH,
-                DISTANCE_BELOW_SAFE_30_METERS
-        );
+        AdaptiveCruise.Decision actualDecision = adaptiveCruise.update(
+                TEST_SPEED_80_KMH, distanceMeters);
 
-        assertEquals(AdaptiveCruise.Mode.BRAKE, secondDecision.mode());
-        assertEquals(EXPECTED_PROPORTIONAL_BRAKE_25, secondDecision.amount(), DELTA);
+        assertEquals(expectedMode, actualDecision.mode());
+        assertEquals(expectedAmount, actualDecision.amount(), DELTA);
     }
 
     @Test
-    void update_WhenAlreadyBrakingAndDistanceBetweenSafeAndRelease_AppliesHysteresisBrakePressure() {
+    void update_AfterReleasingBrake_DoesNotBrakeAgainAboveSafeDistance() {
         adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_BELOW_SAFE_30_METERS);
+        adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_AT_RELEASE_THRESHOLD_48_METERS);
 
-        AdaptiveCruise.Decision hysteresisDecision = adaptiveCruise.update(
+        AdaptiveCruise.Decision actualDecision = adaptiveCruise.update(
                 TEST_SPEED_80_KMH,
                 DISTANCE_IN_HYSTERESIS_BAND_44_METERS
         );
 
-        assertEquals(AdaptiveCruise.Mode.BRAKE, hysteresisDecision.mode());
-        assertEquals(EXPECTED_HYSTERESIS_BRAKE_PRESSURE, hysteresisDecision.amount(), DELTA);
-    }
-
-    @Test
-    void update_WhenAlreadyBrakingAndDistanceReachesReleaseThreshold_ExitsBrakingAndAccelerates() {
-        adaptiveCruise.update(TEST_SPEED_80_KMH, DISTANCE_BELOW_SAFE_30_METERS);
-
-        AdaptiveCruise.Decision releasedDecision = adaptiveCruise.update(
-                TEST_SPEED_80_KMH,
-                DISTANCE_AT_RELEASE_THRESHOLD_48_METERS
-        );
-
-        assertEquals(AdaptiveCruise.Mode.ACCELERATE, releasedDecision.mode());
-        assertEquals(EXPECTED_MAX_ACCELERATION_STEP, releasedDecision.amount(), DELTA);
+        assertEquals(AdaptiveCruise.Mode.ACCELERATE, actualDecision.mode());
+        assertEquals(EXPECTED_MAX_ACCELERATION_STEP, actualDecision.amount(), DELTA);
     }
 
     @ParameterizedTest

@@ -45,14 +45,16 @@ class GearBoxTest {
                 Arguments.of(List.of(GearBox.Gear.R), 50.0, GearBox.Gear.R),
                 Arguments.of(List.of(GearBox.Gear.R), 0.0, GearBox.Gear.D),
                 Arguments.of(List.of(GearBox.Gear.R), 15.0, GearBox.Gear.N),
+                Arguments.of(List.of(GearBox.Gear.R, GearBox.Gear.N), 20.0, GearBox.Gear.N),
                 Arguments.of(List.of(GearBox.Gear.R, GearBox.Gear.N), 20.0, GearBox.Gear.D),
+                Arguments.of(List.of(GearBox.Gear.R, GearBox.Gear.D), 50.0, GearBox.Gear.D),
                 Arguments.of(List.of(GearBox.Gear.R, GearBox.Gear.D), 0.0, GearBox.Gear.R)
         );
     }
 
     @ParameterizedTest
     @MethodSource("illegalGearTransitionsProvider")
-    void changeTo_DisallowedGearTransition_ThrowsIllegalGearChangeException(
+    void changeTo_DisallowedGearTransition_ThrowsAndKeepsCurrentGear(
             List<GearBox.Gear> setupTransitionsAtZeroSpeed,
             double transitionSpeedKmh,
             GearBox.Gear targetGear) {
@@ -61,11 +63,13 @@ class GearBoxTest {
             gearBox.changeTo(stepGear);
         }
         gearBox.setSpeedSensor(() -> transitionSpeedKmh);
+        GearBox.Gear originalGear = gearBox.getCurrentGear();
 
         assertThrows(
                 IllegalGearChangeException.class,
                 () -> gearBox.changeTo(targetGear)
         );
+        assertEquals(originalGear, gearBox.getCurrentGear());
     }
 
     private static Stream<Arguments> illegalGearTransitionsProvider() {

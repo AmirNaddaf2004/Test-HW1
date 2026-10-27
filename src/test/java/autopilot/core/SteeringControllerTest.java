@@ -12,10 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class SteeringControllerTest {
 
     private static final double NORMAL_SPEED_KMH = 80.0;
-    private static final double HIGH_SPEED_KMH = 130.0;
     private static final double VALID_ANGLE_DEGREES = 30.0;
-    private static final double REQUESTED_100_DEGREES = 100.0;
-    private static final double EXPECTED_HIGH_SPEED_CLAMPED_TARGET = 90.0;
     private static final double DELTA = 1e-6;
 
     private SteeringController steeringController;
@@ -50,13 +47,25 @@ class SteeringControllerTest {
         assertEquals(expectedTargetAngleDegrees, steeringController.getTargetAngleDegrees(), DELTA);
     }
 
-    @Test
-    void update_MultipleTicksAtHighSpeed_ReachesHighSpeedClampedTargetAngle() {
-        steeringController.update(REQUESTED_100_DEGREES, HIGH_SPEED_KMH);
+    @ParameterizedTest
+    @CsvSource({
+            "500.0,   80.0,  9,  450.0",
+            "-500.0,  80.0,  9, -450.0",
+            "200.0,  130.0,  3,   90.0",
+            "-200.0, 130.0,  3,  -90.0"
+    })
+    void update_RepeatedRequests_ReachesAndStaysAtAllowedLimit(
+            double requestedAngleDegrees,
+            double speedKmh,
+            int tickCount,
+            double expectedAngleDegrees) {
+        for (int tick = 1; tick < tickCount; tick++) {
+            steeringController.update(requestedAngleDegrees, speedKmh);
+        }
 
-        double secondTickAngle = steeringController.update(REQUESTED_100_DEGREES, HIGH_SPEED_KMH);
+        double actualAngle = steeringController.update(requestedAngleDegrees, speedKmh);
 
-        assertEquals(EXPECTED_HIGH_SPEED_CLAMPED_TARGET, secondTickAngle, DELTA);
+        assertEquals(expectedAngleDegrees, actualAngle, DELTA);
     }
 
     @Test
@@ -87,14 +96,17 @@ class SteeringControllerTest {
         assertEquals(0.0, steeringController.getTargetAngleDegrees(), DELTA);
     }
 
-    @Test
-    void selfCenter_FromAngleBeyondSingleTickStep_ReducesAngleByMaxStepPerTick() {
-        steeringController.update(REQUESTED_100_DEGREES, NORMAL_SPEED_KMH);
-        steeringController.update(REQUESTED_100_DEGREES, NORMAL_SPEED_KMH);
+    @ParameterizedTest
+    @CsvSource({"100.0, 40.0", "-100.0, -40.0"})
+    void selfCenter_FromAngleBeyondSingleTickStep_ReducesAngleByMaxStepPerTick(
+            double initialAngleDegrees,
+            double expectedAngleDegrees) {
+        steeringController.update(initialAngleDegrees, NORMAL_SPEED_KMH);
+        steeringController.update(initialAngleDegrees, NORMAL_SPEED_KMH);
 
         double angleAfterFirstSelfCenter = steeringController.selfCenter();
 
-        assertEquals(40.0, angleAfterFirstSelfCenter, DELTA);
+        assertEquals(expectedAngleDegrees, angleAfterFirstSelfCenter, DELTA);
     }
 
     @ParameterizedTest
